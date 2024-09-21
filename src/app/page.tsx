@@ -9,19 +9,37 @@ import type { CoreMessage } from "ai";
 import { continueConversation } from "./actions";
 import { readStreamableValue } from "ai/rsc";
 
-const defaultMessage = {
+const defaultMessage: CoreMessage = {
   role: "assistant",
   content: "Hello! How can I assist you today?",
 };
 
 export default function Chat() {
-  // const { messages, input, handleInputChange, handleSubmit } = useChat();
-  const [messages, setMessages] = useState<CoreMessage[]>([]);
+  const [messages, setMessages] = useState<CoreMessage[]>([defaultMessage]);
   const [input, setInput] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const newMessage: CoreMessage = { content: input, role: "user" };
+    const updatedMessages = [...messages, newMessage];
+
+    setMessages(updatedMessages);
+    setInput("");
+
+    const result = await continueConversation(updatedMessages);
+
+    for await (const content of readStreamableValue(result)) {
+      setMessages([
+        ...updatedMessages,
+        { role: "assistant", content: content as string },
+      ]);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       <main className="flex-1 overflow-y-auto p-4 space-y-4">
-        {[defaultMessage, ...messages].map((message, index) => (
+        {messages.map((message, index) => (
           <div
             key={index}
             className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
@@ -39,31 +57,7 @@ export default function Chat() {
         ))}
       </main>
       <footer className="p-4 border-t">
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            const newMessages: CoreMessage[] = [
-              ...messages,
-              { content: input, role: "user" },
-            ];
-
-            setMessages(newMessages);
-            setInput("");
-
-            const result = await continueConversation(newMessages);
-
-            for await (const content of readStreamableValue(result)) {
-              setMessages([
-                ...newMessages,
-                {
-                  role: "assistant",
-                  content: content as string,
-                },
-              ]);
-            }
-          }}
-          className="flex gap-2"
-        >
+        <form onSubmit={handleSubmit} className="flex gap-2">
           <Input
             type="text"
             placeholder="Type a message..."
